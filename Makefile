@@ -5,6 +5,5 @@ requirmets:
 
 run:
 	@echo "Running app"
-	streamlit run app.py
-
+	streamlit run app.py --server.maxMessageSize=2048
 all: requirmets run

@@ -1,5 +1,14 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+import altair as alt
+import pandas as pd
+import geopandas as gpd # Requires geopandas -- e.g.: conda install -c conda-forge geopandas
+from shapely import wkt
+import json
+from shapely.geometry import mapping
+
+alt.data_transformers.enable('json')
+
 
 st.title("Mini project")
 st.write("This is a mini project for streamlit")
@@ -119,6 +128,55 @@ def plot_name_evaluation(data, name = 'Marie' ):
     plt.grid()
     return fig
 
+@st.cache_data
+def get_geo_data(geo_json_file='Names_hints/departements-version-simplifiee.geojson'):
+    depts = gpd.read_file(geo_json_file)
+    
+    return depts
+
+@st.cache_data
+def geo_name_evaluation(data, _geo_data, name = 'Marie' ):
+    print("in the geo_name_evaluation")
+    merged_data = pd.merge(data, _geo_data, left_on='Department', right_on='code')
+    grouped_data = merged_data.groupby(['Department', 'First name','Gender'], as_index=False).agg(
+        {'Number of births': 'sum'}
+        )
+    grouped_data = _geo_data.merge(
+            grouped_data,
+            left_on='code',
+            right_on='Department'
+            )
+    ## Convert the geometry to WKT format
+    grouped_data['geometry'] = grouped_data['geometry'].apply(lambda geom: json.dumps(mapping(geom)))
+
+    # Create a DataFrame with GeoJSON objects
+    geo_data = pd.DataFrame({
+        'properties': grouped_data[['Department', 'First name', 'Gender', 'Number of births']].to_dict('records'),
+        'geometry': grouped_data['geometry'].tolist()
+    })
+
+    # Flatten properties column in geo_data DataFrame
+    geo_data = pd.json_normalize(geo_data['properties']).join(geo_data['geometry'])
+
+    # Create the Altair Chart
+    # Create the Altair Chart
+    c = alt.Chart(alt.Data(values=geo_data.to_dict('records'))).mark_geoshape(
+        stroke='white'
+            ).encode(
+                tooltip=[
+                    alt.Tooltip('Department:N'),
+                    alt.Tooltip('First name:N'),
+                    alt.Tooltip('Gender:N'),
+                    alt.Tooltip('Number of births:Q')
+                ],
+                color='Number of births:Q',
+            ).properties(
+                width=800, 
+                height=600, 
+                title=f'Popularity of the name {name} over time'
+            )
+
+    return c
 
 genre2 = st.radio("Gender? ",("Female","Male"))
 
@@ -131,3 +189,20 @@ if genre2 == 'Male':
 
 with st.spinner(f'Wait for evaluation of the name {selected_name}'):
     st.pyplot(plot_name_evaluation(data=data, name=selected_name))
+    
+    
+
+
+
+# Create the map chart is it clicked on the button
+
+if st.button('Show the map'):
+    st.write("Wait for the map to load")
+    with st.spinner('Wait genrating map. It could take several mins...'):
+        map_chart = geo_name_evaluation(data=data,
+                                _geo_data=get_geo_data(),
+                                name=selected_name)
+
+        st.altair_chart(map_chart, use_container_width=True)
+        st.write("Map added to the browser")
+            
