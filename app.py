@@ -9,6 +9,50 @@ from shapely.geometry import mapping
 
 alt.data_transformers.enable('json')
 
+def geo_name_evaluation2(data, _geo_data, name = 'Marie' ):
+    print("in the geo_name_evaluation")
+
+    # Filter data based on 'name' as soon as possible
+    data = data[data['First name'] == name]
+
+    # Group by necessary columns and compute the sum of births
+    data_grouped = data.groupby(['Department', 'First name','Gender'], as_index=False).agg(
+        {'Number of births': 'sum'}
+        )
+
+    # Merge once 
+    merged_data = _geo_data.merge(data_grouped, left_on='code', right_on='Department')
+
+    # Convert the geometry to GeoJSON format using vectorized operation
+    merged_data['geometry'] = merged_data['geometry'].map(mapping)
+
+    # Create a DataFrame with GeoJSON objects
+    geo_data = pd.DataFrame({
+        'properties': merged_data[['Department', 'First name', 'Gender', 'Number of births']].to_dict('records'),
+        'geometry': merged_data['geometry'].tolist()
+    })
+
+    # Flatten properties column in geo_data DataFrame
+    geo_data = pd.json_normalize(geo_data['properties']).join(geo_data['geometry'])
+
+    # Create the Altair Chart
+    chart = alt.Chart(alt.Data(values=geo_data.to_dict('records'))).mark_geoshape(
+        stroke='white'
+            ).encode(
+                tooltip=[
+                    alt.Tooltip('Department:N'),
+                    alt.Tooltip('First name:N'),
+                    alt.Tooltip('Gender:N'),
+                    alt.Tooltip('Number of births:Q')
+                ],
+                color='Number of births:Q',
+            ).properties(
+                width=800, 
+                height=600, 
+                title=f'Popularity of the name {name} over time'
+            )
+
+    return chart
 
 st.title("Mini project")
 st.write("This is a mini project for streamlit")
@@ -29,7 +73,7 @@ def read_csv(csv_file):
     df = pd.read_csv(csv_file, sep=';')
     return df
 
-@st.cache_data
+#@st.cache_data
 def process_data(data):
     new_column_names = ['Gender', 'First name', 'Year','Department', 'Number of births']
     data.columns = new_column_names
@@ -50,10 +94,11 @@ def process_data(data):
     data['First name'] = data['First name'].str.lower().str.capitalize()
     
     return data
-    
-data = read_csv(csv_file=csv_file)
-data = process_data(data=data)
-st.dataframe(data)
+
+with st.spinner("Loadding data..."):    
+    data = read_csv(csv_file=csv_file)
+    data = process_data(data=data)
+    st.dataframe(data)
 
 
 @st.cache_data
@@ -147,7 +192,8 @@ def geo_name_evaluation(data, _geo_data, name = 'Marie' ):
             right_on='Department'
             )
     ## Convert the geometry to WKT format
-    grouped_data['geometry'] = grouped_data['geometry'].apply(lambda geom: json.dumps(mapping(geom)))
+    #grouped_data['geometry'] = grouped_data['geometry'].apply(lambda geom: json.dumps(mapping(geom)))
+    grouped_data['geometry'] = grouped_data['geometry'].apply(lambda x: mapping(x))
 
     # Create a DataFrame with GeoJSON objects
     geo_data = pd.DataFrame({
@@ -199,7 +245,10 @@ with st.spinner(f'Wait for evaluation of the name {selected_name}'):
 if st.button('Show the map'):
     st.write("Wait for the map to load")
     with st.spinner('Wait genrating map. It could take several mins...'):
-        map_chart = geo_name_evaluation(data=data,
+        with st.spinner('Wait for it...'):
+            goegraphic_data = get_geo_data()
+        
+        map_chart = geo_name_evaluation2(data=data,
                                 _geo_data=get_geo_data(),
                                 name=selected_name)
 
