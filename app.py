@@ -7,9 +7,17 @@ from shapely import wkt
 import json
 from shapely.geometry import mapping
 import folium
-
+import os
+from llm import anlyze_data
+processed_data_file = 'processed_data.csv'
 alt.data_transformers.enable('json')
 
+# write  dataframe to csv file
+def write_csv(df, filename='processed_data.csv'):
+    try:
+        df.to_csv(filename, index=False, encoding='utf-8', sep=';')
+    except Exception as e:
+        raise e
 def geo_name_evaluation2(data, _geo_data, name = 'Marie' ):
     print("in the geo_name_evaluation")
 
@@ -76,6 +84,10 @@ def read_csv(csv_file):
 
 #@st.cache_data
 def process_data(data):
+    if type(data) is not pd.DataFrame:
+        # read the csv file
+        return read_csv(data)
+    
     new_column_names = ['Gender', 'First name', 'Year','Department', 'Number of births']
     data.columns = new_column_names
     # drope rows with NaN values
@@ -94,12 +106,27 @@ def process_data(data):
     data = data[data['First name'] != '_PRENOMS_RARES']
     data['First name'] = data['First name'].str.lower().str.capitalize()
     
+    write_csv(df=data, filename=processed_data_file)
     return data
 
 with st.spinner("Loadding data..."):    
     data = read_csv(csv_file=csv_file)
-    data = process_data(data=data)
+    # if process_data_file exists, read it
+
+    if os.path.exists(processed_data_file):
+        data = process_data(data=processed_data_file)
+    else:
+        data = read_csv(csv_file)
+        data = process_data(data=data)
+    
     st.dataframe(data)
+    # if content_cached:
+    #     content_cached = anlyze_content
+    # else:
+    #     content_cached = ""
+    with st.expander("See explanation"):
+        anlyze_content = anlyze_data(data=data, comment="Trent of evaluation of first name over time, and make sure not repeating any thing in following analysis: {content_cached}}")
+        st.markdown(anlyze_content, unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -137,7 +164,12 @@ year = st.selectbox("Year",get_years(data=data))
 
 with st.spinner('Wait for it...'):
     popular_names = get_popular_names (data=data,year=year,gender=genre,top=10)
+    content_cached = anlyze_content
+    anlyze_content = anlyze_data(data=popular_names, comment=f"Top 10 most popular {genre} names in {year}. make sur to not repeat the following content {content_cached}") 
+    
     st.pyplot(plot_popular_name(data=popular_names[0], title=popular_names[1]))
+    with st.expander("See explanation"):
+        st.markdown(anlyze_content)    
 
 
 @st.cache_data
@@ -172,13 +204,17 @@ def plot_name_evaluation(data, name = 'Marie' ):
     plt.xlabel('Year')
     plt.ylabel('Number of births')
     plt.grid()
-    return fig
+    return fig, grouped_data
 
 @st.cache_data
 def get_geo_data(geo_json_file='Names_hints/departements-version-simplifiee.geojson'):
-    depts = gpd.read_file(geo_json_file)
-    
-    return depts
+    if os.path.exists(geo_json_file):
+        depts = gpd.read_file(geo_json_file)
+        print("geo data read from file")
+        print(depts.head())
+        return depts
+    else:
+        raise Exception(f'File {geo_json_file} does not exist')
 
 @st.cache_data
 def geo_name_evaluation(data, _geo_data, name = 'Marie' ):
@@ -229,35 +265,45 @@ genre2 = st.radio("Gender? ",("Female","Male"))
 
 if genre2 == "Female":
     top_female_name = get_popular_names(data=data,gender=genre2,top=20)
+    
     selected_name = st.selectbox(" Name", top_female_name.index.tolist()) 
 if genre2 == 'Male':
     top_male_name = get_popular_names(data=data,gender=genre2,top=20)
     selected_name = st.selectbox("Name?" , top_male_name.index.tolist())
 
 with st.spinner(f'Wait for evaluation of the name {selected_name}'):
-    st.pyplot(plot_name_evaluation(data=data, name=selected_name))
+    map, name_evaluation = plot_name_evaluation(data=data, name=selected_name)
+    print(name_evaluation.head())
+    content_cached = anlyze_content
+    anlyze_content = anlyze_data(data=name_evaluation.head(50), comment=f"Popularity of the name {selected_name} over time. make sur to not repeat the following content {content_cached}")
+   
+    st.pyplot(map)
+    with st.expander("See explanation"):
+        st.markdown(anlyze_content)     
     
-    
-
 
 
 
 
 # Create the map chart if the "Show the map" button is clicked
-if st.button('Show the map'):
-    st.write("Wait for the map to load")
-    with st.spinner('Wait generating map. It could take several mins...'):
-        geographic_data = get_geo_data()
+# if st.button('Show the map'):
+#     st.write("Wait for the map to load")
+#     with st.spinner('Wait generating map. It could take several mins...'):
+#         print("Going to get the geo data")
+#         geographic_data = get_geo_data()
+#         print("geo data read")
+#         print(geographic_data.head())
+#         # print out the geographic data
         
-        # Calculate the latitude and longitude from the geometry column
-        geographic_data['latitude'] = geographic_data['geometry'].centroid.y
-        geographic_data['longitude'] = geographic_data['geometry'].centroid.x
+#         # Calculate the latitude and longitude from the geometry column
+#         geographic_data['latitude'] = geographic_data['geometry'].centroid.y
+#         geographic_data['longitude'] = geographic_data['geometry'].centroid.x
 
-        # Create the map chart using folium
-        map_chart = folium.Map(location=[geographic_data['latitude'].mean(), geographic_data['longitude'].mean()], zoom_start=4)
-        for _, row in geographic_data.iterrows():
-            folium.Marker([row['latitude'], row['longitude']]).add_to(map_chart)
+#         # Create the map chart using folium
+#         map_chart = folium.Map(location=[geographic_data['latitude'].mean(), geographic_data['longitude'].mean()], zoom_start=4)
+#         for _, row in geographic_data.iterrows():
+#             folium.Marker([row['latitude'], row['longitude']]).add_to(map_chart)
 
-        # Display the chart using st.write
-        st.write(map_chart._repr_html_(), unsafe_allow_html=True)
-        st.write("Map added to the browser")
+#         # Display the chart using st.write
+#         st.write(map_chart._repr_html_(), unsafe_allow_html=True)
+#         st.write("Map added to the browser")
