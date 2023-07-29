@@ -6,6 +6,7 @@ import geopandas as gpd # Requires geopandas -- e.g.: conda install -c conda-for
 from shapely import wkt
 import json
 from shapely.geometry import mapping
+import folium
 
 alt.data_transformers.enable('json')
 
@@ -240,18 +241,23 @@ with st.spinner(f'Wait for evaluation of the name {selected_name}'):
 
 
 
-# Create the map chart is it clicked on the button
 
+
+# Create the map chart if the "Show the map" button is clicked
 if st.button('Show the map'):
     st.write("Wait for the map to load")
-    with st.spinner('Wait genrating map. It could take several mins...'):
-        with st.spinner('Wait for it...'):
-            goegraphic_data = get_geo_data()
+    with st.spinner('Wait generating map. It could take several mins...'):
+        geographic_data = get_geo_data()
         
-        map_chart = geo_name_evaluation2(data=data,
-                                _geo_data=get_geo_data(),
-                                name=selected_name)
+        # Calculate the latitude and longitude from the geometry column
+        geographic_data['latitude'] = geographic_data['geometry'].centroid.y
+        geographic_data['longitude'] = geographic_data['geometry'].centroid.x
 
-        st.altair_chart(map_chart, use_container_width=True)
+        # Create the map chart using folium
+        map_chart = folium.Map(location=[geographic_data['latitude'].mean(), geographic_data['longitude'].mean()], zoom_start=4)
+        for _, row in geographic_data.iterrows():
+            folium.Marker([row['latitude'], row['longitude']]).add_to(map_chart)
+
+        # Display the chart using st.write
+        st.write(map_chart._repr_html_(), unsafe_allow_html=True)
         st.write("Map added to the browser")
-            

@@ -4,3 +4,4 @@ seaborn
 streamlit
 geopandas
 altair
+folium
