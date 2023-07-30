@@ -1,10 +1,12 @@
 #Note: The openai-python library support for Azure OpenAI is in preview.
 import os
 import openai
+import streamlit as st
 openai.api_type = "azure"
 openai.api_base = "https://hamzeplayground.openai.azure.com/"
 openai.api_version = "2023-03-15-preview"
-openai.api_key = os.getenv("OPENAI_API_KEY")
+#openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 data = """
 Year
