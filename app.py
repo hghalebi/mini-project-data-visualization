@@ -11,7 +11,15 @@ import os
 from llm import anlyze_data
 processed_data_file = 'processed_data.csv'
 alt.data_transformers.enable('json')
-
+ui = {
+    'title': 'Mini project as data visualization project  ',
+    'subtitle': 'This is a mini project aims to visualize the data of first name in France and make some analysis based on name trend over time.',
+    'welcome_message': 'Welcome to the mini project',
+    'loading_data': 'Loadding data...',
+    'raw_data': 'you can see the table of raw data below. You can surf by scrolling down',
+    'name of time': 'Please filter data by name then chose a gender to see its trend over time',
+    
+}
 # write  dataframe to csv file
 def write_csv(df, filename='processed_data.csv'):
     try:
@@ -63,8 +71,8 @@ def geo_name_evaluation2(data, _geo_data, name = 'Marie' ):
 
     return chart
 
-st.title("Mini project")
-st.write("This is a mini project for streamlit")
+st.title(ui['title'])
+st.write(ui['subtitle'])
 csv_file = 'Names_hints/dpt2020.csv'
 import pandas as pd
 
@@ -119,15 +127,17 @@ with st.spinner("Loadding data..."):
         data = read_csv(csv_file)
         data = process_data(data=data)
     
+    st.write(ui['raw_data'])
     st.dataframe(data)
     # if content_cached:
     #     content_cached = anlyze_content
     # else:
     #     content_cached = ""
+    
     with st.expander("See explanation"):
         anlyze_content = anlyze_data(data=data, comment="Trent of evaluation of first name over time, and make sure not repeating any thing in following analysis: {content_cached}}")
         st.markdown(anlyze_content, unsafe_allow_html=True)
-
+    st.success("Done!")
 
 @st.cache_data
 def get_yearly_births(data):
@@ -157,7 +167,8 @@ def plot_popular_name(data,top = 10, title="You need modify the title"):
 @st.cache_data
 def get_years(data):
     return data['Year'].unique().tolist()
-
+st.title("Top 10 popular Names")
+st.write("Filter data by gender and year")
 genre = st.radio("Gender",("Female","Male"))
 year = st.selectbox("Year",get_years(data=data))
 
@@ -170,7 +181,7 @@ with st.spinner('Wait for it...'):
     st.pyplot(plot_popular_name(data=popular_names[0], title=popular_names[1]))
     with st.expander("See explanation"):
         st.markdown(anlyze_content)    
-
+    st.success("Done!")
 
 @st.cache_data
 def get_popular_names(data,gender='Female',top = 20):
@@ -260,8 +271,9 @@ def geo_name_evaluation(data, _geo_data, name = 'Marie' ):
             )
 
     return c
-
-genre2 = st.radio("Gender? ",("Female","Male"))
+st.title("Names trends over time")
+st.write(" In this session we will see the popularity of a name over time by gender")
+genre2 = st.radio(ui['name of time'],("Female","Male"))
 
 if genre2 == "Female":
     top_female_name = get_popular_names(data=data,gender=genre2,top=20)
@@ -275,12 +287,12 @@ with st.spinner(f'Wait for evaluation of the name {selected_name}'):
     map, name_evaluation = plot_name_evaluation(data=data, name=selected_name)
     print(name_evaluation.head())
     content_cached = anlyze_content
-    anlyze_content = anlyze_data(data=name_evaluation.head(50), comment=f"Popularity of the name {selected_name} over time. make sur to not repeat the following content {content_cached}")
+    anlyze_content = anlyze_data(data=name_evaluation.head(50), comment=f"The main point of this analyse is the popularity of the name {selected_name} over time and it significances.")
    
     st.pyplot(map)
     with st.expander("See explanation"):
         st.markdown(anlyze_content)     
-    
+    st.success("Done!")
 
 
 
