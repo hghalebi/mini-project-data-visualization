@@ -5,3 +5,6 @@ streamlit
 geopandas
 altair
 folium
+langchain
+openai
+rich
